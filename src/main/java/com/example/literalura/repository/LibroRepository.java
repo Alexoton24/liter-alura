@@ -1,4 +1,8 @@
 package com.example.literalura.repository;
 
-public interface LibroRepository {
+import com.example.literalura.model.Libro;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface LibroRepository extends JpaRepository<Libro, Long> {
+
 }

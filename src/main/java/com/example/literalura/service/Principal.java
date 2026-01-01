@@ -1,11 +1,13 @@
 package com.example.literalura.service;
 
+import com.example.literalura.model.Autor;
 import com.example.literalura.model.DatosGenerales;
 import com.example.literalura.model.DatosLibro;
-import org.springframework.beans.factory.annotation.Value;
+import com.example.literalura.model.Libro;
+import com.example.literalura.repository.AutorRepository;
+import com.example.literalura.repository.LibroRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 
-import java.net.URL;
-import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
 
@@ -16,16 +18,41 @@ public class Principal {
     private ConsumoApi consumoApi = new ConsumoApi();
     private ConvierteDatos convierteDatos = new ConvierteDatos();
     private Scanner scanner = new Scanner(System.in);
+    private AutorRepository autorRepository;
+    private LibroRepository libroRepository;
 
     private String json;
 
 
-    public Principal(String urlBase) {
+    public Principal(String urlBase, AutorRepository autorRepository, LibroRepository libroRepository) {
+        this.autorRepository = autorRepository;
+        this.libroRepository = libroRepository;
         this.URL_BASE = urlBase;
     }
 
     public void principal(){
-        mapeaLibroPorNombre();
+        boolean noQuiereSalir = true;
+        while (noQuiereSalir) {
+
+            System.out.println("""
+                    1-. Guardar libros
+                    0-. salir
+                    """);
+            int op = scanner.nextInt();
+            ;
+            scanner.nextLine();
+
+
+            switch (op) {
+                case 1:
+                    mapeaLibroPorNombre();
+                    break;
+                case 0:
+                    noQuiereSalir = false;
+                    break;
+            }
+        }
+
 
     }
 
@@ -50,26 +77,69 @@ public class Principal {
 
             DatosGenerales datosGenerales = convierteDatos.convierteDatos(json, DatosGenerales.class);
 
+            //Vereficamos si existe el lirbo en la bbusqueda
             Optional<DatosLibro> datosLibro = datosGenerales.datosLibros().stream()
 
                     .findFirst();
 
-            if(!datosLibro.isEmpty()){
-
-                System.out.println("Libro encontrado...");
-                System.out.println("Datos del libro");
-
-                datosLibro.stream().forEach(d-> System.out.println("titulo -> " +
-                        "" + d.titulo() + " Datos autores -> " +  d.datosAutoresList()));
-            }else{
-                System.out.println("Error libro  no encontrado");
+            if(!datosLibro.isPresent()){
+                System.out.println("No se pudo encontrar ese libro");
             }
 
+            DatosLibro datosLibroVerificado = datosLibro.get();
 
+
+
+
+
+            //si no existe en la db el libro
+            if(!libroRepository.existsById(datosLibroVerificado.id())){
+
+                //creamos libro
+
+                // creamos hijo con datos verificados
+                Libro libroVertifiado = new Libro(datosLibroVerificado);
+
+                //Al hijo creado le asignamos el id de la api
+                libroVertifiado.setLibroId(datosLibroVerificado.id());
+
+                Optional<Autor> autor =  datosLibroVerificado.datosAutoresList().stream()
+                        .map(d-> new Autor(d))
+                        .findFirst();
+
+                //si el autor ya existe en la db
+                if(autor.isPresent()) {
+                    Autor autorVerifiado = autor.get();
+
+                    Optional<Autor> autorEnDB = autorRepository.findByNombreAutorIgnoreCase(autorVerifiado.getNombreAutor());
+
+                    if(autorEnDB.isPresent()){
+                        Autor autorExistente = autorEnDB.get();
+                        libroVertifiado.setAutor(autorExistente);
+                        autorExistente.getLibroList().add(libroVertifiado);
+                    }else{
+                        libroVertifiado.setAutor(autorVerifiado);
+                        autorVerifiado.getLibroList().add(libroVertifiado);
+                        autorRepository.save(autorVerifiado);
+                    }
+
+                }
+                
+                libroRepository.save(libroVertifiado);
+
+            }
+
+        }catch (DataIntegrityViolationException e){
+            System.out.println("Error ... " +
+                    "Ese libro ya staba agregado, intente con uno nuevo o vea que libros tiene registrados " + e.getMessage());
         } catch (Exception e) {
-            System.out.println("Error mapea libros nombre");
+
             throw new RuntimeException(e);
         }
+
+    }
+
+    private void buscaLiibrosRegistrados(){
 
     }
 
