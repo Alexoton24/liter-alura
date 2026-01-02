@@ -71,7 +71,7 @@ public class Principal {
                     break;
             }
         }
-
+        scanner.close();
 
     }
 
@@ -276,4 +276,5 @@ public class Principal {
         System.out.println("Autor mas antiguo -> " + statisticsAutor.getMin());
         System.out.println("Total de autores -> " + statisticsAutor.getCount());
     }
+
 }
